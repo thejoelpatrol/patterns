@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import png
-from .utils import Bitmap
+from patterns.macpaint_file.macpaint import MacPaintFile
+from patterns.src.utils import Bitmap
 
 
 class ImageInput(ABC):
@@ -31,8 +32,13 @@ class PNGInput(ImageInput):
         return bitmap
 
 
-class MacpaintInput(ImageInput):
+class MacPaintInput(ImageInput):
     @staticmethod
     def input(path: str) -> Bitmap:
-        raise NotImplementedError()
+        pntg = MacPaintFile.from_file(path)
+        inverted_values = [
+            [0 if p else 1 for p in row] for row in pntg.bitmap
+        ]
+        return Bitmap(pntg.WIDTH, pntg.HEIGHT, inverted_values)
+
 

@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import List, Union
+from typing import List, Union, Optional
 
 
 class Bitmap:
-    def __init__(self, width: int, height: int, pixels=None):
+    def __init__(self, width: int, height: int, pixels: Optional[List[List[int]]] = None):
         self.width = width
         self.height = height
         self.pixels = [] # type: List[List[int]]
