@@ -1,0 +1,3 @@
+[submodule "macpaint-file"]
+	path = macpaint-file
+	url = https://github.com/thejoelpatrol/macpaint-file
