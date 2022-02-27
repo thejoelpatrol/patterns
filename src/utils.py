@@ -36,3 +36,13 @@ class Bitmap:
                 if p != other.pixels[i][j]:
                     return False
         return True
+
+def bytes_to_bits(buf: bytes) -> List[int]:
+    result = []
+    for b in buf:
+        for i in range(8):
+            mask = 1 << i
+            bit = b & mask
+            bit = bit >> i
+            result.append(bit)
+    return result

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from .utils import Bitmap
-from typing import Tuple
+from .utils import Bitmap, bytes_to_bits
+from typing import Tuple, List
 
 
 class Doodler(ABC):
@@ -140,3 +140,54 @@ class OutlineDoodler(Doodler):
                 current = (current[0] - next_move[0], current[1] - next_move[1])
                 next_move = self._go_right(next_move)
                 current = (current[0] + next_move[0], current[1] + next_move[1])
+
+
+class ByteStringDoodler(Doodler):
+
+    def __init__(self, mask: Bitmap, byte_string: bytes):
+        super().__init__(mask)
+        self.bitstring = bytes_to_bits(byte_string)
+
+    def _generate(self):
+        i = 0
+        for y, row in enumerate(self.mask.pixels):
+            for x, px in enumerate(row):
+                if px:
+                    self._image.pixels[y][x] = self.bitstring[i]
+                    i += 1
+
+        self._masked = True
+
+
+class PatternDoodler(Doodler):
+
+    def __init__(self, mask: Bitmap, pattern: Bitmap):
+        super().__init__(mask)
+        self.pattern = pattern
+
+    def _generate(self):
+        for y in range(self.height):
+            for x in range(self.width):
+                pattern_y = y % self.pattern.height
+                pattern_x = x % self.pattern.width
+                self._image.pixels[y][x] = self.pattern.pixels[pattern_y][pattern_x]
+
+
+class PatternMultiDoodler(Doodler):
+
+    def __init__(self, pattern_masks: List[Tuple[Bitmap, Bitmap]]):
+        mask = Bitmap(pattern_masks[0][1].width, pattern_masks[0][0].height)
+        for pattern, mask in pattern_masks:
+            mask.add(mask)
+        super(PatternMultiDoodler, self).__init__(mask)
+        self.pattern_masks = pattern_masks
+
+    def _generate(self):
+        for pattern, mask in self.pattern_masks:
+            for y in range(self.height):
+                for x in range(self.width):
+                    if mask.pixels[y][x]:
+                        pattern_y = y % pattern.height
+                        pattern_x = x % pattern.width
+                        self._image.pixels[y][x] = pattern.pixels[pattern_y][pattern_x]
+        self._masked = True
