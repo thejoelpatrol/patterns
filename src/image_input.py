@@ -1,4 +1,7 @@
+import os
 from abc import ABC, abstractmethod
+from typing import List
+
 import png
 from patterns.macpaint_file.macpaint import MacPaintFile
 from patterns.src.utils import Bitmap
@@ -31,6 +34,16 @@ class PNGInput(ImageInput):
                         bitmap.set(x, y)
         return bitmap
 
+    @staticmethod
+    def read_pattern_directory(path: str) -> List[Bitmap]:
+        files = os.listdir(path)
+        paths = []
+        for file in files:
+            if file in [".", ".."]:
+                continue
+            paths.append(os.path.join(path, file))
+        patterns = [PNGInput.input(file) for file in paths]
+        return patterns
 
 class MacPaintInput(ImageInput):
     @staticmethod
