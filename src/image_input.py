@@ -38,6 +38,7 @@ class PNGInput(ImageInput):
     def read_pattern_directory(path: str) -> List[Bitmap]:
         files = os.listdir(path)
         paths = []
+        files.sort()
         for file in files:
             if file in [".", ".."]:
                 continue

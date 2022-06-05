@@ -1,6 +1,8 @@
+import math
 from abc import ABC, abstractmethod
-from .utils import Bitmap, bytes_to_bits
+import random
 from typing import Tuple, List
+from patterns.src.utils import Bitmap, bytes_to_bits, generate_random_mask, generate_random_box_mask
 
 
 class Doodler(ABC):
@@ -191,3 +193,47 @@ class PatternMultiDoodler(Doodler):
                         pattern_x = x % pattern.width
                         self._image.pixels[y][x] = pattern.pixels[pattern_y][pattern_x]
         self._masked = True
+
+
+class RandomPatternMultiDoodler(PatternMultiDoodler):
+    MAX_FILL = 0.35
+
+    def __init__(self, width: int, height: int, min_region_complexity: int, patterns: List[Bitmap], target_fill_fraction: float=0):
+        masks = []
+        for _ in range(len(patterns)):
+            mask = generate_random_mask(width, height, min_region_complexity, self.MAX_FILL - 0.1)
+            masks.append(mask)
+        total_mask = Bitmap(width, height)
+        for mask in masks:
+            total_mask.add(mask)
+
+        mask_iter = iter(masks)
+        while total_mask.percent_filled < target_fill_fraction:
+            print(total_mask.percent_filled)
+            remaining_options = len(masks)
+            for mask in masks:
+                if mask.percent_filled > self.MAX_FILL:
+                    remaining_options -= 1
+            if remaining_options == 0:
+                print("sorry")
+                break
+
+            try:
+                mask = mask_iter.__next__()
+                if mask.percent_filled > self.MAX_FILL:
+                    continue
+                region = generate_random_box_mask(width, height, overscan_x=200, overscan_y=200,
+                                                    max_fill= 1.0 / math.sqrt(remaining_options))
+                if region.intersects(mask):
+                    mask.add(region)
+                    total_mask.add(mask)
+            except StopIteration:
+                mask_iter = iter(masks)
+
+        print(total_mask.percent_filled)
+        random_pattern_masks = list(zip(patterns, masks))
+        background_mask = Bitmap(width, height)
+        background_mask.fill_black()
+        random_pattern_masks.append( (random.sample(patterns, 1)[0], background_mask) )
+        random_pattern_masks.reverse()
+        super(RandomPatternMultiDoodler, self).__init__(random_pattern_masks)
