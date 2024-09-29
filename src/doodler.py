@@ -198,10 +198,10 @@ class PatternMultiDoodler(Doodler):
 class RandomPatternMultiDoodler(PatternMultiDoodler):
     MAX_FILL = 0.35
 
-    def __init__(self, width: int, height: int, min_region_complexity: int, patterns: List[Bitmap], target_fill_fraction: float=0):
+    def __init__(self, width: int, height: int, min_region_complexity: int, patterns: List[Bitmap], target_fill_fraction: float=0, max_fill_per_layer=MAX_FILL):
         masks = []
         for _ in range(len(patterns)):
-            mask = generate_random_mask(width, height, min_region_complexity, self.MAX_FILL - 0.1)
+            mask = generate_random_mask(width, height, min_region_complexity, max_fill_per_layer - 0.1)
             masks.append(mask)
         total_mask = Bitmap(width, height)
         for mask in masks:
@@ -212,7 +212,7 @@ class RandomPatternMultiDoodler(PatternMultiDoodler):
             print(total_mask.percent_filled)
             remaining_options = len(masks)
             for mask in masks:
-                if mask.percent_filled > self.MAX_FILL:
+                if mask.percent_filled > max_fill_per_layer:
                     remaining_options -= 1
             if remaining_options == 0:
                 print("sorry")
@@ -220,7 +220,7 @@ class RandomPatternMultiDoodler(PatternMultiDoodler):
 
             try:
                 mask = mask_iter.__next__()
-                if mask.percent_filled > self.MAX_FILL:
+                if mask.percent_filled > max_fill_per_layer:
                     continue
                 region = generate_random_box_mask(width, height, overscan_x=200, overscan_y=200,
                                                     max_fill= 1.0 / math.sqrt(remaining_options))
