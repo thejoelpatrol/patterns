@@ -4,6 +4,7 @@ import random
 from typing import Tuple, List
 from patterns.src.utils import Bitmap, bytes_to_bits, generate_random_mask, generate_random_box_mask
 
+DEBUG = False
 
 class Doodler(ABC):
 
@@ -179,12 +180,16 @@ class PatternMultiDoodler(Doodler):
 
     def __init__(self, pattern_masks: List[Tuple[Bitmap, Bitmap]]):
         mask = Bitmap(pattern_masks[0][1].width, pattern_masks[0][0].height)
+        if DEBUG:
+            print("adding pattern masks")
         for pattern, mask in pattern_masks:
             mask.add(mask)
         super(PatternMultiDoodler, self).__init__(mask)
         self.pattern_masks = pattern_masks
 
     def _generate(self):
+        if DEBUG:
+            print("generating PatternMultiDoodler")
         for pattern, mask in self.pattern_masks:
             for y in range(self.height):
                 for x in range(self.width):
@@ -201,12 +206,18 @@ class RandomPatternMultiDoodler(PatternMultiDoodler):
     def __init__(self, width: int, height: int, min_region_complexity: int, patterns: List[Bitmap], target_fill_fraction: float=0, max_fill_per_layer=MAX_FILL):
         masks = []
         for _ in range(len(patterns)):
+            if DEBUG:
+                print("generating random mask")
             mask = generate_random_mask(width, height, min_region_complexity, max_fill_per_layer - 0.1)
             masks.append(mask)
+        if DEBUG:
+            print("making bitmap mask")
         total_mask = Bitmap(width, height)
         for mask in masks:
             total_mask.add(mask)
 
+        if DEBUG:
+            print("filling masks")
         mask_iter = iter(masks)
         while total_mask.percent_filled < target_fill_fraction:
             print(total_mask.percent_filled)

@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import List, Union, Optional
 import random
 
+DEBUG = False
+
 class Bitmap:
     def __init__(self, width: int, height: int, pixels: Optional[List[List[int]]] = None):
         self.width = width
@@ -57,6 +59,8 @@ class Bitmap:
         return Bitmap(width, height, pixels)
 
     def intersects(self, other: Bitmap):
+        if DEBUG:
+            print("intersects?")
         for y in range(0, min(self.height, other.height)):
             for x in range(0, min(self.width, other.width)):
                 if self.pixels[y][x] and other.pixels[y][x]:
@@ -97,25 +101,29 @@ def bytes_to_bits(buf: bytes) -> List[int]:
 
 def generate_random_box_mask(width: int, height: int, overscan_x: int=200, overscan_y: int=200,
                              min_fill: float=0, max_fill: float=1.0) -> Bitmap:
+    if DEBUG:
+        print("generating random box max")
     while True:
         col1 = random.randint(-1 * overscan_x, width / 2)
         col2 = random.randint(width / 2, width + overscan_x)
         row1 = random.randint(-1 * overscan_y, height / 2)
         row2 = random.randint(height / 2, height + overscan_y)
-        mask = Bitmap(width, height)
         x1 = max(col1, 0)
         x2 = min(col2, width - 1)
         y1 = max(row1, 0)
         y2 = min(row2, height - 1)
+        pct_filled = float((x2 - x1) * (y2 - y1)) / (width * height)
+        if pct_filled < min_fill or pct_filled > max_fill:
+            continue
+        mask = Bitmap(width, height)
         for y in range(y1, y2):
             for x in range(x1, x2):
                 mask.set(x, y)
-        pct_filled = mask.percent_filled
-        if min_fill <= pct_filled <= max_fill:
+        if min_fill <= mask.percent_filled <= max_fill:
             return mask
 
 def generate_random_mask(width: int, height: int, target_regions: int, target_max_fill: float) -> Bitmap:
-    mask = generate_random_box_mask(width, height, max_fill=0.20)
+    mask = generate_random_box_mask(width, height, min_fill=0.05, max_fill=0.20)
     for _ in range(target_regions - 1):
         region = generate_random_box_mask(width, height, max_fill=0.20)
         while (not mask.intersects(region)):
