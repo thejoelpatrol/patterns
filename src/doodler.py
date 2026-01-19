@@ -1,20 +1,25 @@
 import math
 from abc import ABC, abstractmethod
 import random
-from typing import Tuple, List
-from patterns.src.utils import Bitmap, bytes_to_bits, generate_random_mask, generate_random_box_mask
+from enum import Enum
+from typing import Tuple, List, Dict
+from .utils import Bitmap, bytes_to_bits, generate_random_mask, generate_random_box_mask
 
-DEBUG = False
+DEBUG = True
 
 class Doodler(ABC):
 
     def __init__(self, mask: Bitmap):
+        if DEBUG:
+            print(f"Doodler.__init__()")
         self.mask = mask
         self.width = self.mask.width
         self.height = self.mask.height
         self._image = Bitmap(self.width, self.height)
         self._generated = False
         self._masked = False
+        if DEBUG:
+            print(f"Doodler.__init__() done")
 
     def generate(self) -> Bitmap:
         self._generated = True
@@ -248,3 +253,166 @@ class RandomPatternMultiDoodler(PatternMultiDoodler):
         random_pattern_masks.append( (random.sample(patterns, 1)[0], background_mask) )
         random_pattern_masks.reverse()
         super(RandomPatternMultiDoodler, self).__init__(random_pattern_masks)
+
+
+class PatternPolygon(PatternDoodler):
+    def __init__(self, width: int, height: int, pattern: Bitmap, stroked = True):
+        self._gen_mask(width, height)
+        self.stroked = stroked
+        super(PatternPolygon, self).__init__(self.mask, pattern)
+
+    @abstractmethod
+    def _gen_mask(self, width: int, height: int):
+        raise NotImplementedError()
+
+
+class PatternTriangle(PatternPolygon):
+    def _gen_mask(self, width: int, height: int):
+        self.mask = Bitmap(width, height)
+        for _ in range(3):
+            raise NotImplementedError()
+
+class PatternRectangle(PatternPolygon):
+    def _gen_mask(self, width: int, height: int):
+        self.mask = Bitmap(width, height)
+        self.x0 = random.randint(0, width - 1)
+        self.y0 = random.randint(0, height - 1)
+        self.x1 = random.randint(self.x0, width - 1)
+        self.y1 = random.randint(self.y0, height - 1)
+        for y in range(self.y0, self.y1 + 1):
+            for x in range(self.x0, self.x1 + 1):
+                self.mask.set(x, y)
+
+    def _generate(self):
+        super(PatternRectangle, self)._generate()
+        if self.stroked:
+            self.image.fill_line(self.x0, self.y0, self.x1, self.y0)
+            self.image.fill_line(self.x0, self.y1, self.x1, self.y1)
+            self.image.fill_line(self.x0, self.y0, self.x0, self.y1)
+            self.image.fill_line(self.x1, self.y0, self.x1, self.y1)
+
+
+class Direction(Enum):
+    UP = 0
+    DOWN = 1
+    LEFT = 2
+    RIGHT = 3
+
+    @classmethod
+    def increment(cls, direction: "Direction") -> Tuple[int, int]:
+        INCREMENT = {cls.UP: (0,-1), cls.DOWN: (0,1), cls.LEFT: (-1,0), cls.RIGHT: (1,0)}
+        return INCREMENT[direction]
+
+
+class MaskSquiggler(Doodler):
+    def __init__(self, mask: Bitmap, n_sqiggles: int, min_length: int = 1, max_length: int = 100, turn_propbability: float=0.1):
+        super().__init__(mask)
+        self.n_sqiggles = n_sqiggles
+        self.min_length = min_length
+        self.max_length = max_length
+        self.turn_propbability = turn_propbability
+
+    def _embellish(self, i: int, x: int, y: int, direction: Direction):
+        pass
+
+    def _generate(self):
+        for i in range(self.n_sqiggles):
+            direction = Direction(random.randint(0, 3))
+            x = random.randint(0, self.width - 1)
+            y = random.randint(0, self.height - 1)
+            len = random.randint(self.min_length, self.max_length)
+            print(f"generating squiggle {i}")
+            for i in range(len):
+                self.image.set(x, y)
+                increment = Direction.increment(direction)
+                x += increment[0]
+                y += increment[1]
+                if x < 0:
+                    x = 0
+                if x >= self.width:
+                    x = self.width - 1
+                if y < 0:
+                    y = 0
+                if y >= self.height:
+                    y = self.height - 1
+                self._embellish(i, x, y, direction)
+                if random.random() < self.turn_propbability:
+                    direction = Direction(random.randint(0, 3))
+
+
+class Squiggler(MaskSquiggler):
+    def __init__(self, width: int, height: int, n_sqiggles: int, min_length: int = 1, max_length: int = 100, turn_propbability: float=0.1):
+        mask = Bitmap(width, height)
+        mask.fill_black()
+        super().__init__(mask, n_sqiggles, min_length, max_length, turn_propbability)
+
+    def _generate(self):
+        super()._generate()
+        self._masked = True
+
+
+class TelegraphSquiggler(MaskSquiggler):
+    def __init__(self, mask: Bitmap, n_sqiggles: int, min_length: int = 1, max_length: int = 100, turn_propbability: float = 0.1, cross_probability: float = 0.1):
+        super().__init__(mask, n_sqiggles, min_length, max_length, turn_propbability)
+        self.cross_probability = cross_probability
+        self.just_set = False
+
+    def _embellish(self, i: int, x: int, y: int, direction: Direction):
+        if random.random() < self.cross_probability and not self.just_set:
+            length = random.randint(1, 5)
+            if direction in (Direction.UP, Direction.DOWN):
+                for j in range(length):
+                    self.image.set(x - j, y)
+                    self.image.set(x + j, y)
+            else:
+                for j in range(length):
+                    self.image.set(x, y - j)
+                    self.image.set(x, y + j)
+            self.just_set = True
+        else:
+            self.just_set = False
+
+
+
+class NoiseMaskDoodler(Doodler):
+    def __init__(self, mask: Bitmap, probability: float=0.1):
+        super().__init__(mask)
+        self.probability = probability
+
+    def _generate(self):
+        for x in range(self.width):
+            for y in range(self.height):
+                if random.random() < self.probability:
+                    self.image.set(x, y)
+
+class NoiseDoodler(NoiseMaskDoodler):
+    def __init__(self, width: int, height: int, probability: float=0.1):
+        mask = Bitmap(width, height)
+        mask.fill_black()
+        super().__init__(mask, probability)
+
+
+class LineDoodler(Doodler):
+    def __init__(self, mask: Bitmap, n_lines: int, max_dimension: int):
+        super().__init__(mask)
+        self.n_lines = n_lines
+        self.max_dimension = max_dimension
+
+    def _generate(self):
+        for i in range(self.n_lines):
+            x0 = random.randint(0, self.width - 1)
+            y0 = random.randint(0, self.height - 1)
+            if x0 > self.width / 2:
+                x1 = random.randint(x0 - self.max_dimension, x0)
+            else:
+                x1 = random.randint(x0, x0 + self.max_dimension)
+            if y0 > self.height / 2:
+                y1 = random.randint(y0 - self.max_dimension, y0)
+            else:
+                y1 = random.randint(y0, y0 + self.max_dimension)
+            self.image.fill_line(x0, y0, x1, y1)
+
+# triangle masks
+# polygon masks
+# roundrect masks
+

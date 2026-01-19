@@ -2,8 +2,6 @@ from __future__ import annotations
 from typing import List, Union, Optional
 import random
 
-DEBUG = False
-
 class Bitmap:
     def __init__(self, width: int, height: int, pixels: Optional[List[List[int]]] = None):
         self.width = width
@@ -24,9 +22,20 @@ class Bitmap:
                 self.pixels[y][x] = self.pixels[y][x] | other.pixels[y][x]
         self._pct_filled = None
 
+    def remove(self, other: Bitmap):
+        if not self.intersects(other):
+            return
+        for y in range(min(other.height, self.height)):
+            for x in range(min(other.width, self.width)):
+                self.pixels[y][x] &= ~other.pixels[y][x]
+        self.pct_filled = None
+
     def set(self, x: int, y: int):
-        self.pixels[y][x] = 1
-        self._pct_filled = None
+        try:
+            self.pixels[y][x] = 1
+            self._pct_filled = None
+        except IndexError:
+            print(f"WARNING: tried to set ({y},{x}) out of bounds")
 
     def clear(self, x: int, y: int):
         self.pixels[y][x] = 0
@@ -36,13 +45,18 @@ class Bitmap:
         for y in range(self.height):
             for x in range(self.width):
                 self.set(x, y)
-        self._pct_filled = None
+        self._pct_filled = 1.0
 
     def erase(self):
         for y in range(self.height):
             for x in range(self.width):
                 self.clear(x, y)
-        self._pct_filled = None
+        self._pct_filled = 0.0
+
+    def invert(self):
+        for y in range(self.height):
+            for x in range(self.width):
+                self.pixels[y][x] ^= 1
 
     def scale(self, x_factor: int, y_factor: int) -> Bitmap:
         width = self.width * x_factor
@@ -59,8 +73,6 @@ class Bitmap:
         return Bitmap(width, height, pixels)
 
     def intersects(self, other: Bitmap):
-        if DEBUG:
-            print("intersects?")
         for y in range(0, min(self.height, other.height)):
             for x in range(0, min(self.width, other.width)):
                 if self.pixels[y][x] and other.pixels[y][x]:
@@ -77,6 +89,46 @@ class Bitmap:
                     filled += 1
         self._pct_filled = float(filled) / (self.width * self.height)
         return self._pct_filled
+
+    def clone(self) -> Bitmap:
+        new = Bitmap(self.width, self.height)
+        for y in range(self.height):
+            for x in range(self.width):
+                if self.pixels[y][x]:
+                    new.set(x, y)
+        return new
+
+    def fill_line(self, x0: int, y0: int, x1: int, y1: int):
+        if x1 == x0:
+            for y in range(y0, y1):
+                self.set(x0, y)
+        elif y1 == y0:
+            for x in range(x0, x1):
+                self.set(x, y0)
+        else:
+            # https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
+            dx = abs(x1 - x0)
+            sign_x = 1 if x0 < x1 else -1
+            dy = -abs(y1 - y0)
+            sign_y = 1 if y0 < y1 else -1
+            error = dx + dy
+
+            x = x0
+            y = y0
+            while True:
+                self.set(x, y)
+                e2 = 2 * error
+                if e2 >= dy:
+                    if x == x1:
+                        break
+                    error = error + dy
+                    x = x + sign_x
+                if e2 <= dx:
+                    if y == y1:
+                        break
+                    error = error + dx
+                    y = y + sign_y
+        self.pct_filled = None
 
     def __eq__(self, other: Bitmap):
         if self.width != other.width:
@@ -101,29 +153,25 @@ def bytes_to_bits(buf: bytes) -> List[int]:
 
 def generate_random_box_mask(width: int, height: int, overscan_x: int=200, overscan_y: int=200,
                              min_fill: float=0, max_fill: float=1.0) -> Bitmap:
-    if DEBUG:
-        print("generating random box max")
     while True:
         col1 = random.randint(-1 * overscan_x, width / 2)
         col2 = random.randint(width / 2, width + overscan_x)
         row1 = random.randint(-1 * overscan_y, height / 2)
         row2 = random.randint(height / 2, height + overscan_y)
+        mask = Bitmap(width, height)
         x1 = max(col1, 0)
         x2 = min(col2, width - 1)
         y1 = max(row1, 0)
         y2 = min(row2, height - 1)
-        pct_filled = float((x2 - x1) * (y2 - y1)) / (width * height)
-        if pct_filled < min_fill or pct_filled > max_fill:
-            continue
-        mask = Bitmap(width, height)
         for y in range(y1, y2):
             for x in range(x1, x2):
                 mask.set(x, y)
-        if min_fill <= mask.percent_filled <= max_fill:
+        pct_filled = mask.percent_filled
+        if min_fill <= pct_filled <= max_fill:
             return mask
 
 def generate_random_mask(width: int, height: int, target_regions: int, target_max_fill: float) -> Bitmap:
-    mask = generate_random_box_mask(width, height, min_fill=0.05, max_fill=0.20)
+    mask = generate_random_box_mask(width, height, max_fill=0.20)
     for _ in range(target_regions - 1):
         region = generate_random_box_mask(width, height, max_fill=0.20)
         while (not mask.intersects(region)):
