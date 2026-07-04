@@ -100,10 +100,10 @@ class Bitmap:
 
     def fill_line(self, x0: int, y0: int, x1: int, y1: int):
         if x1 == x0:
-            for y in range(y0, y1):
+            for y in range(y0, y1 + 1):
                 self.set(x0, y)
         elif y1 == y0:
-            for x in range(x0, x1):
+            for x in range(x0, x1 + 1):
                 self.set(x, y0)
         else:
             # https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
@@ -140,6 +140,19 @@ class Bitmap:
                 if p != other.pixels[i][j]:
                     return False
         return True
+
+    def __str__(self):
+        result = str()
+        for y in range(self.height):
+            print(f"row {y}")
+            for x in range(self.width):
+                if self.pixels[y][x]:
+                    result += "#"
+                else:
+                    result += " "
+            result += "\n"
+        print(f"str {result}")
+        return result
 
 def bytes_to_bits(buf: bytes) -> List[int]:
     result = []

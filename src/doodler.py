@@ -269,8 +269,34 @@ class PatternPolygon(PatternDoodler):
 class PatternTriangle(PatternPolygon):
     def _gen_mask(self, width: int, height: int):
         self.mask = Bitmap(width, height)
+        self.vertices = list()
         for _ in range(3):
-            raise NotImplementedError()
+            x = random.randint(0, width - 1)
+            y = random.randint(0, height - 1)
+            self.vertices.append((x, y))
+        for i in range(3):
+            i_1 = (i + 1) % 3
+            v1 = self.vertices[i]
+            v2 = self.vertices[i_1]
+            self.mask.fill_line(v1[0], v1[1], v2[0], v2[1])
+        for y in range(self.mask.height):
+            leftmost = None
+            rightmost = None
+            for x in range(self.mask.width):
+                if self.mask.pixels[y][x]:
+                    if not leftmost:
+                        leftmost = x
+                    rightmost = x
+            if leftmost and rightmost:
+                self.mask.fill_line(leftmost, y, rightmost, y)
+
+    def _generate(self):
+        super(PatternTriangle, self)._generate()
+        if self.stroked:
+            for i in range(3):
+                i_1 = (i + 1) % 3
+                self.image.fill_line(self.vertices[i][0], self.vertices[i][1], self.vertices[i_1][0], self.vertices[i_1][1])
+
 
 class PatternRectangle(PatternPolygon):
     def _gen_mask(self, width: int, height: int):
@@ -412,7 +438,6 @@ class LineDoodler(Doodler):
                 y1 = random.randint(y0, y0 + self.max_dimension)
             self.image.fill_line(x0, y0, x1, y1)
 
-# triangle masks
 # polygon masks
 # roundrect masks
 
