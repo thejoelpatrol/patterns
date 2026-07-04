@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from typing import List
 
 import png
-from patterns.macpaint_file.macpaint import MacPaintFile
-from patterns.src.utils import Bitmap
+from .macpaint_file.macpaint import MacPaintFile
+from .utils import Bitmap
 
 
 class ImageInput(ABC):

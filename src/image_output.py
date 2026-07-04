@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import png
 from .utils import Bitmap
-
+from .macpaint_file.macpaint import MacPaintFile
 
 class ImageOutput(ABC):
     @staticmethod
@@ -24,4 +24,9 @@ class PNGOutput(ImageOutput):
 class MacpaintOutput(ImageOutput):
     @staticmethod
     def output(path: str, bitmap: Bitmap):
-        raise NotImplementedError()
+        converted_data = []
+        for row in bitmap.pixels:
+            new_row = [255 if p == 0 else 0 for p in row]
+            converted_data.append(new_row)
+        macpaint = MacPaintFile.from_scanlines(converted_data)
+        macpaint.write_file(path)
