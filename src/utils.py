@@ -144,14 +144,12 @@ class Bitmap:
     def __str__(self):
         result = str()
         for y in range(self.height):
-            print(f"row {y}")
             for x in range(self.width):
                 if self.pixels[y][x]:
                     result += "#"
                 else:
                     result += " "
             result += "\n"
-        print(f"str {result}")
         return result
 
 def bytes_to_bits(buf: bytes) -> List[int]:

@@ -256,14 +256,39 @@ class RandomPatternMultiDoodler(PatternMultiDoodler):
 
 
 class PatternPolygon(PatternDoodler):
-    def __init__(self, width: int, height: int, pattern: Bitmap, stroked = True):
-        self._gen_mask(width, height)
+    def __init__(self, width: int, height: int, pattern: Bitmap, n_vertices: int, stroked = True):
         self.stroked = stroked
+        self.n_vertices = n_vertices
+        self._gen_mask(width, height)
         super(PatternPolygon, self).__init__(self.mask, pattern)
 
-    @abstractmethod
+    #@abstractmethod
     def _gen_mask(self, width: int, height: int):
-        raise NotImplementedError()
+        self.mask = Bitmap(width, height)
+        self.vertices = list()
+        for _ in range(self.n_vertices):
+            x = random.randint(0, width - 1)
+            y = random.randint(0, height - 1)
+            self.vertices.append((x, y))
+        for i in range(self.n_vertices):
+            i_1 = (i + 1) % self.n_vertices
+            v1 = self.vertices[i]
+            v2 = self.vertices[i_1]
+            self.mask.fill_line(v1[0], v1[1], v2[0], v2[1])
+        counter = 0
+        for y in range(self.mask.height):
+            for x in range(self.mask.width):
+                if self.mask.pixels[y][x]:
+                    counter += 1
+                if counter % 2:
+                    self.mask.set(x, y)
+
+    def _generate(self):
+        super(PatternPolygon, self)._generate()
+        if self.stroked:
+            for i in range(self.n_vertices):
+                i_1 = (i + 1) % self.n_vertices
+                self.image.fill_line(self.vertices[i][0], self.vertices[i][1], self.vertices[i_1][0], self.vertices[i_1][1])
 
 
 class PatternTriangle(PatternPolygon):
