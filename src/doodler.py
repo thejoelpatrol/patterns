@@ -1,8 +1,11 @@
 import math
 from abc import ABC, abstractmethod
 import random
+from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple, List, Dict
+from json.encoder import INFINITY
+from operator import truediv
+from typing import Tuple, List, Dict, Optional
 from .utils import Bitmap, bytes_to_bits, generate_random_mask, generate_random_box_mask
 
 DEBUG = True
@@ -254,6 +257,48 @@ class RandomPatternMultiDoodler(PatternMultiDoodler):
         random_pattern_masks.reverse()
         super(RandomPatternMultiDoodler, self).__init__(random_pattern_masks)
 
+class Edge():
+    INFINITY = float("inf")
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+    slope: float
+
+    def __init__(self, x1, y1, x2, y2):
+        if x1 < x2:
+            self.x1 = x1
+            self.y1 = y1
+            self.x2 = x2
+            self.y2 = y2
+        else:
+            self.x1 = x2
+            self.y1 = y2
+            self.x2 = x1
+            self.y2 = y1
+        if x1 == x2:
+            self.slope = INFINITY
+        else:
+            self.slope = float(self.y2 - self.y1) / float(self.x2 - self.x1)
+
+    def get_intersection(self, scanline_y: int) -> int | None:
+        if self.slope == 0:
+            return None
+        if scanline_y not in range(min(self.y1, self.y2), max(self.y1, self.y2) + 1):
+            return None
+        if self.slope == INFINITY:
+            return self.x1
+        x = self.x1 + (scanline_y - self.y1) / self.slope
+        intersection = int(round(x, 6))
+        return intersection
+
+    def is_endpoint(self, x: int, y: int) -> bool:
+        if self.x1 == x and self.y1 == y:
+            return True
+        if self.x2 == x and self.y2 == y:
+            return True
+        return False
+
 
 class PatternPolygon(PatternDoodler):
     def __init__(self, width: int, height: int, pattern: Bitmap, n_vertices: int, stroked = True):
@@ -266,6 +311,7 @@ class PatternPolygon(PatternDoodler):
     def _gen_mask(self, width: int, height: int):
         self.mask = Bitmap(width, height)
         self.vertices = list()
+        self.edges = list()
         for _ in range(self.n_vertices):
             x = random.randint(0, width - 1)
             y = random.randint(0, height - 1)
@@ -274,14 +320,47 @@ class PatternPolygon(PatternDoodler):
             i_1 = (i + 1) % self.n_vertices
             v1 = self.vertices[i]
             v2 = self.vertices[i_1]
+            self.edges.append(Edge(v1[0], v1[1], v2[0], v2[1]))
             self.mask.fill_line(v1[0], v1[1], v2[0], v2[1])
-        counter = 0
         for y in range(self.mask.height):
-            for x in range(self.mask.width):
-                if self.mask.pixels[y][x]:
-                    counter += 1
-                if counter % 2:
-                    self.mask.set(x, y)
+            active_edges = list()
+            for edge in self.edges:
+                intersection = edge.get_intersection(y)
+                if intersection is not None:
+                    active_edges.append( (edge, intersection) )
+            active_edges.sort(key = lambda edge_intersections: edge_intersections[1])
+            remove_indices = list()
+            for i in range(1, len(active_edges)):
+                # check for corners
+                edge1, x_intersection1 = active_edges[i - 1]
+                edge2, x_intersection2 = active_edges[i]
+                if not edge1.is_endpoint(x_intersection1, y) or not edge2.is_endpoint(x_intersection2, y):
+                    continue
+                if x_intersection1 != x_intersection2:
+                    # these endpoints are part of separate corners, not touching
+                    continue
+                # two touching endpoints, must be a corner
+                if edge1.y1 <= y and edge1.y2 <= y and edge2.y1 <= y and edge2.y2 <= y:
+                    # cusp facing downward, count it twice
+                    continue
+                if edge1.y1 >= y and edge1.y2 >= y and edge2.y1 >= y and edge2.y2 >= y:
+                    # cusp facing upward, count it twice
+                    continue
+                remove_indices.append(i - 1)
+            remove_indices.reverse()
+            all_potentially_active_edges = active_edges.copy()
+            for i in remove_indices:
+                del active_edges[i]
+            for i in range(0, len(active_edges), 2):
+                x1 = active_edges[i][1]
+                x2 = active_edges[i + 1][1]
+                self.mask.fill_line(x1, y, x2, y)
+
+            #for x in range(self.mask.width):
+            #    if x in intersections:
+            #        counter += 1
+            #    if counter % 2:
+            #        self.mask.set(x, y)
 
     def _generate(self):
         super(PatternPolygon, self)._generate()
@@ -292,6 +371,9 @@ class PatternPolygon(PatternDoodler):
 
 
 class PatternTriangle(PatternPolygon):
+    def __init__(self, width: int, height: int, pattern: Bitmap):
+        super(PatternTriangle, self).__init__(width, height, pattern, 3)
+
     def _gen_mask(self, width: int, height: int):
         self.mask = Bitmap(width, height)
         self.vertices = list()
@@ -324,12 +406,16 @@ class PatternTriangle(PatternPolygon):
 
 
 class PatternRectangle(PatternPolygon):
+    def __init__(self, width, height, pattern):
+        super(PatternRectangle, self).__init__(width, height, pattern, 4)
+
     def _gen_mask(self, width: int, height: int):
         self.mask = Bitmap(width, height)
         self.x0 = random.randint(0, width - 1)
         self.y0 = random.randint(0, height - 1)
         self.x1 = random.randint(self.x0, width - 1)
         self.y1 = random.randint(self.y0, height - 1)
+        self.vertices = [(self.x0, self.y0), (self.x1, self.y0), (self.x1, self.y1), (self.x0, self.y1)]
         for y in range(self.y0, self.y1 + 1):
             for x in range(self.x0, self.x1 + 1):
                 self.mask.set(x, y)
