@@ -266,6 +266,8 @@ class Edge():
     slope: float
 
     def __init__(self, x1, y1, x2, y2):
+        self.vertical = False
+        self.horizontal = False
         if x1 < x2:
             self.x1 = x1
             self.y1 = y1
@@ -276,13 +278,16 @@ class Edge():
             self.y1 = y2
             self.x2 = x1
             self.y2 = y1
+        if self.y1 == self.y2:
+            self.horizontal = True
         if x1 == x2:
             self.slope = INFINITY
+            self.vertical = True
         else:
             self.slope = float(self.y2 - self.y1) / float(self.x2 - self.x1)
 
     def get_intersection(self, scanline_y: int) -> int | None:
-        if self.slope == 0:
+        if self.horizontal or self.slope == 0: # technically the same right? but what if float behaves like float???
             return None
         if scanline_y not in range(min(self.y1, self.y2), max(self.y1, self.y2) + 1):
             return None
@@ -299,6 +304,9 @@ class Edge():
             return True
         return False
 
+    def __str__(self):
+        return f"edge: ({self.x1}, {self.y1}), ({self.x2}, {self.y2}); v:{self.vertical} h:{self.horizontal}"
+
 
 class PatternPolygon(PatternDoodler):
     def __init__(self, width: int, height: int, pattern: Bitmap, n_vertices: int, stroked = True):
@@ -308,6 +316,8 @@ class PatternPolygon(PatternDoodler):
         super(PatternPolygon, self).__init__(self.mask, pattern)
 
     #@abstractmethod
+    # https://www.sunshine2k.de/coding/java/Polygon/Filling/FillPolygon.htm
+    # https://derek.comp.dkit.ie/graphics/polygonFilling/polygonFilling.html
     def _gen_mask(self, width: int, height: int):
         self.mask = Bitmap(width, height)
         self.vertices = list()
@@ -328,6 +338,13 @@ class PatternPolygon(PatternDoodler):
                 intersection = edge.get_intersection(y)
                 if intersection is not None:
                     active_edges.append( (edge, intersection) )
+                elif edge.horizontal and edge.y1 == y:
+                    # unfortunate special case
+                    # we don't need to fill the line itself but it starts and stops at a corner
+                    # this is a pretty bad hack. it's probably not correct.
+                    # it can, like, draw and not crash, but sometimes messes up the negative space result
+                    # having to do this is an artifact of me not implementing this algorithm very well
+                    active_edges.append( (edge, edge.x1) )
             active_edges.sort(key = lambda edge_intersections: edge_intersections[1])
             remove_indices = list()
             for i in range(1, len(active_edges)):
@@ -458,7 +475,8 @@ class MaskSquiggler(Doodler):
             x = random.randint(0, self.width - 1)
             y = random.randint(0, self.height - 1)
             len = random.randint(self.min_length, self.max_length)
-            print(f"generating squiggle {i}")
+            if DEBUG:
+                print(f"generating squiggle {i}")
             for i in range(len):
                 self.image.set(x, y)
                 increment = Direction.increment(direction)
