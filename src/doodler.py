@@ -388,8 +388,8 @@ class PatternPolygon(PatternDoodler):
 
 
 class PatternTriangle(PatternPolygon):
-    def __init__(self, width: int, height: int, pattern: Bitmap):
-        super(PatternTriangle, self).__init__(width, height, pattern, 3)
+    def __init__(self, width: int, height: int, pattern: Bitmap, stroked = True):
+        super(PatternTriangle, self).__init__(width, height, pattern, 3, stroked=stroked)
 
     def _gen_mask(self, width: int, height: int):
         self.mask = Bitmap(width, height)
@@ -423,8 +423,8 @@ class PatternTriangle(PatternPolygon):
 
 
 class PatternRectangle(PatternPolygon):
-    def __init__(self, width, height, pattern):
-        super(PatternRectangle, self).__init__(width, height, pattern, 4)
+    def __init__(self, width, height, pattern, stroked = True):
+        super(PatternRectangle, self).__init__(width, height, pattern, 4, stroked = stroked)
 
     def _gen_mask(self, width: int, height: int):
         self.mask = Bitmap(width, height)
