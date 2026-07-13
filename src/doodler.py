@@ -280,6 +280,7 @@ class Edge():
             self.y2 = y1
         if self.y1 == self.y2:
             self.horizontal = True
+            #raise RuntimeError("TODO delete this later!")
         if x1 == x2:
             self.slope = INFINITY
             self.vertical = True
@@ -307,11 +308,21 @@ class Edge():
     def __str__(self):
         return f"edge: ({self.x1}, {self.y1}), ({self.x2}, {self.y2}); v:{self.vertical} h:{self.horizontal}"
 
+@dataclass
+class Point:
+    x: int
+    y: int
+
 
 class PatternPolygon(PatternDoodler):
-    def __init__(self, width: int, height: int, pattern: Bitmap, n_vertices: int, stroked = True):
+    def __init__(self, width: int, height: int, pattern: Bitmap, n_vertices: int, start: Point = None, max_distance: int = None, stroked = True):
         self.stroked = stroked
         self.n_vertices = n_vertices
+        if start:
+            self.start = start
+        else:
+            self.start = Point(random.randint(0, width - 1), random.randint(0, height - 1))
+        self.max_distance = max_distance
         self._gen_mask(width, height)
         super(PatternPolygon, self).__init__(self.mask, pattern)
 
@@ -322,35 +333,50 @@ class PatternPolygon(PatternDoodler):
         self.mask = Bitmap(width, height)
         self.vertices = list()
         self.edges = list()
-        for _ in range(self.n_vertices):
-            x = random.randint(0, width - 1)
-            y = random.randint(0, height - 1)
-            self.vertices.append((x, y))
+        self.vertices.append( (self.start.x, self.start.y) )
+        if self.max_distance:
+            for i in range(1, self.n_vertices):
+                dx = random.randint(-self.max_distance, self.max_distance)
+                while self.vertices[i - 1][0] + dx < 0 or self.vertices[i - 1][0] + dx > width - 1:
+                    dx = random.randint(-self.max_distance, self.max_distance)
+                dy = random.randint(-self.max_distance, self.max_distance)
+                while self.vertices[i - 1][1] + dy < 0 or self.vertices[i - 1][1] + dy > height - 1:
+                    dy = random.randint(-self.max_distance, self.max_distance)
+                x = self.vertices[i - 1][0] + dx
+                y = self.vertices[i - 1][1] + dy
+                self.vertices.append((x, y))
+        else:
+            for _ in range(1, self.n_vertices):
+                x = random.randint(0, width - 1)
+                y = random.randint(0, height - 1)
+                self.vertices.append((x, y))
         for i in range(self.n_vertices):
             i_1 = (i + 1) % self.n_vertices
             v1 = self.vertices[i]
             v2 = self.vertices[i_1]
             self.edges.append(Edge(v1[0], v1[1], v2[0], v2[1]))
             self.mask.fill_line(v1[0], v1[1], v2[0], v2[1])
+
+        active_edges = list()
         for y in range(self.mask.height):
-            active_edges = list()
+            edge_intersections = list()
             for edge in self.edges:
-                intersection = edge.get_intersection(y)
-                if intersection is not None:
-                    active_edges.append( (edge, intersection) )
-                elif edge.horizontal and edge.y1 == y:
-                    # unfortunate special case
-                    # we don't need to fill the line itself but it starts and stops at a corner
-                    # this is a pretty bad hack. it's probably not correct.
-                    # it can, like, draw and not crash, but sometimes messes up the negative space result
-                    # having to do this is an artifact of me not implementing this algorithm very well
-                    active_edges.append( (edge, edge.x1) )
-            active_edges.sort(key = lambda edge_intersections: edge_intersections[1])
+                if edge.y1 == y or edge.y2 == y:
+                    if edge in active_edges:
+                        active_edges.remove(edge)
+                    else:
+                        active_edges.append(edge)
+                if edge in active_edges:
+                    intersection = edge.get_intersection(y)
+                    if intersection is not None:
+                        edge_intersections.append( (edge, intersection) )
+
+            edge_intersections.sort(key = lambda edge_intersection: edge_intersection[1])
             remove_indices = list()
-            for i in range(1, len(active_edges)):
+            for i in range(1, len(edge_intersections)):
                 # check for corners
-                edge1, x_intersection1 = active_edges[i - 1]
-                edge2, x_intersection2 = active_edges[i]
+                edge1, x_intersection1 = edge_intersections[i - 1]
+                edge2, x_intersection2 = edge_intersections[i]
                 if not edge1.is_endpoint(x_intersection1, y) or not edge2.is_endpoint(x_intersection2, y):
                     continue
                 if x_intersection1 != x_intersection2:
@@ -365,19 +391,17 @@ class PatternPolygon(PatternDoodler):
                     continue
                 remove_indices.append(i - 1)
             remove_indices.reverse()
-            all_potentially_active_edges = active_edges.copy()
+            all_potentially_active_edges = edge_intersections.copy()
             for i in remove_indices:
-                del active_edges[i]
-            for i in range(0, len(active_edges), 2):
-                x1 = active_edges[i][1]
-                x2 = active_edges[i + 1][1]
+                del edge_intersections[i]
+            for i in range(0, len(edge_intersections), 2):
+                x1 = edge_intersections[i][1]
+                x2 = edge_intersections[i + 1][1]
                 self.mask.fill_line(x1, y, x2, y)
+        if DEBUG:
+            for edge in self.edges:
+                print(edge)
 
-            #for x in range(self.mask.width):
-            #    if x in intersections:
-            #        counter += 1
-            #    if counter % 2:
-            #        self.mask.set(x, y)
 
     def _generate(self):
         super(PatternPolygon, self)._generate()
