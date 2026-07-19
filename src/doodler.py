@@ -327,7 +327,7 @@ class PatternOval(PatternDoodler):
     def _gen_mask(self, mask_width: int, mask_height: int):
         self.mask = Bitmap(mask_width, mask_height)
         self.mask.draw_oval(self.upper_left.x, self.upper_left.y, self.lower_right.x, self.lower_right.y)
-        self.mask.fill_closed_shape(BoundingBox(Point(self.upper_left.x, self.upper_left.y), Point(self.lower_right.x, self.lower_right.y)))
+        self.mask.fill_convex_shape(BoundingBox(Point(self.upper_left.x, self.upper_left.y), Point(self.lower_right.x, self.lower_right.y)))
 
     def _generate(self):
         super(PatternOval, self)._generate()
@@ -336,7 +336,7 @@ class PatternOval(PatternDoodler):
 
 
 class PatternRoundRect(PatternDoodler):
-    RADIUS = 9
+    RADIUS = 8 # not including the start row/col
 
     def __init__(self, mask_width: int, mask_height: int, pattern: Bitmap, bounds: Tuple[Point, Point], stroked = True):
         """
@@ -355,7 +355,7 @@ class PatternRoundRect(PatternDoodler):
     def _gen_mask(self, mask_width: int, mask_height: int):
         self.mask = Bitmap(mask_width, mask_height)
         self.mask.draw_roundrect(BoundingBox(self.upper_left, self.lower_right), self.RADIUS)
-        self.mask.fill_closed_shape(BoundingBox(Point(self.upper_left.x, self.upper_left.y), Point(self.lower_right.x, self.lower_right.y)))
+        self.mask.fill_convex_shape(BoundingBox(Point(self.upper_left.x, self.upper_left.y), Point(self.lower_right.x, self.lower_right.y)))
 
     def _generate(self):
         super(PatternRoundRect, self)._generate()

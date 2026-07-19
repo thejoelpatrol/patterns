@@ -200,8 +200,8 @@ class Bitmap:
         else:
             raise RuntimeError(f"wat? ({x0},{y0}) -> ({x1},{y1}")
 
-        a = abs(x1 - x0)
-        b = abs(y1 - y0)
+        a = max(1, abs(x1 - x0))
+        b = max(1, abs(y1 - y0))
         for x in range(x0, x1 + 1):
             y = self._ellipse_y(center_x, center_y, a, b, x, positive)
             self.set(x, y)
@@ -247,14 +247,27 @@ class Bitmap:
         upper_right = Point(bounds.lower_right.x, upper_left.y)
         lower_left = Point(bounds.upper_left.x, lower_right.y)
 
-        upper_left_start = Point(upper_left.x, upper_left.y + radius - 1)
-        upper_left_end = Point(upper_left.x + radius - 1, upper_left.y)
-        upper_right_start = Point(upper_right.x - radius + 1, upper_right.y)
-        upper_right_end = Point(upper_right.x, upper_left.y  + radius - 1)
-        lower_left_start = Point(lower_left.x, lower_left.y - radius + 1)
-        lower_left_end = Point(lower_left.x + radius - 1, lower_left.y)
-        lower_right_start = Point(lower_right.x - radius + 1, lower_right.y)
-        lower_right_end = Point(lower_right.x, lower_left.y - radius + 1)
+        # it would be cool if i were smart enough to handle this case with the same math
+        # whatever
+        if upper_left.x == lower_right.x or upper_left.y == lower_right.y:
+            self.fill_line(upper_left.x, upper_left.y, lower_right.x, lower_right.y)
+            return
+
+        radius_x = radius
+        radius_y = radius
+        if lower_right.x - upper_left.x < 2 * radius_x:
+            radius_x = max(1, (lower_right.x - upper_left.x) // 2)
+        if lower_right.y - upper_left.y < 2 * radius_y:
+            radius_y = max(1, (lower_right.y - upper_left.y) // 2)
+
+        upper_left_start = Point(upper_left.x, upper_left.y + radius_y)
+        upper_left_end = Point(upper_left.x + radius_x, upper_left.y)
+        upper_right_start = Point(upper_right.x - radius_x, upper_right.y)
+        upper_right_end = Point(upper_right.x, upper_left.y  + radius_y)
+        lower_left_start = Point(lower_left.x, lower_left.y - radius_y)
+        lower_left_end = Point(lower_left.x + radius_x, lower_left.y)
+        lower_right_start = Point(lower_right.x - radius_x, lower_right.y)
+        lower_right_end = Point(lower_right.x, lower_left.y - radius_y)
 
         self.draw_arc(upper_left_start.x, upper_left_start.y, upper_left_end.x, upper_left_end.y, False)
         self.draw_arc(upper_right_start.x, upper_right_start.y, upper_right_end.x, upper_right_end.y, False)
@@ -266,16 +279,24 @@ class Bitmap:
         self.fill_line(lower_left_end.x, lower_left_end.y, lower_right_start.x, lower_right_start.y)
         self.fill_line(upper_right_end.x, upper_right_end.y, lower_right_end.x, lower_right_end.y)
 
-    def fill_closed_shape(self, bounds: BoundingBox):
+    def fill_convex_shape(self, bounds: BoundingBox):
         for y in range(bounds.upper_left.y, bounds.lower_right.y):
             start = None
             end = None
             for x in range(bounds.upper_left.x, bounds.lower_right.x + 1):
-                if not start and self.pixels[y][x]:
-                    start = Point(x, y)
                 if start and self.pixels[y][x]:
                     end = Point(x, y)
-            self.fill_line(start.x, start.y, end.x, end.y)
+                if not start and self.pixels[y][x]:
+                    start = Point(x, y)
+            if start and end:
+                self.fill_line(start.x, start.y, end.x, end.y)
+            elif start:
+                # single pixel edge
+                pass
+            elif end:
+                raise RuntimeError(f"wat? {bounds} -- {y}")
+            else:
+                raise RuntimeError(f"wat? {bounds} -- {y}")
 
 def bytes_to_bits(buf: bytes) -> List[int]:
     result = []
