@@ -143,9 +143,9 @@ class Bitmap:
         y_squared = float( (a**2 * b**2) - (b**2 * translated_x**2) ) / a**2
         y = math.sqrt(y_squared)
         if positive:
-            return int(y) + center_y
+            return int(round(y)) + center_y
         else:
-            return -int(y) + center_y
+            return -int(round(y)) + center_y
 
     def _ellipse_x(self, center_x: int, center_y: int, a: int, b: int, y: int, positive: bool) -> int :
         if y < center_y:
@@ -158,9 +158,9 @@ class Bitmap:
         x_squared = float( (a**2 * b**2) - (a**2 * translated_y**2) ) / b**2
         x = math.sqrt(x_squared)
         if positive:
-            return int(x) + center_x
+            return int(round(x)) + center_x
         else:
-            return -int(x) + center_x
+            return -int(round(x)) + center_x
 
     def draw_arc(self, x0: int, y0: int, x1: int, y1: int, positive: bool):
         """
@@ -199,6 +199,14 @@ class Bitmap:
         for y in range(y0, y1 + increment, increment):
             x = self._ellipse_x(center_x, center_y, a, b, y, right)
             self.set(x, y)
+
+    def draw_oval(self, x0: int, y0: int, x1: int, y1: int):
+        x_mid = (x0 + x1) // 2
+        y_mid = (y0 +  y1) // 2
+        self.draw_arc(x0, y_mid, x_mid, y0, False)
+        self.draw_arc(x_mid, y0, x1, y_mid, False)
+        self.draw_arc(x0, y_mid, x_mid, y1, True)
+        self.draw_arc(x_mid, y1, x1, y_mid, True)
 
     def __eq__(self, other: Bitmap):
         if self.width != other.width:
