@@ -5,8 +5,10 @@ from dataclasses import dataclass
 from enum import Enum
 from json.encoder import INFINITY
 from operator import truediv
+from re import Pattern
 from typing import Tuple, List, Dict, Optional
-from .utils import Bitmap, bytes_to_bits, generate_random_mask, generate_random_box_mask
+from .utils import Bitmap, bytes_to_bits, generate_random_mask, generate_random_box_mask, Point, \
+    BoundingBox
 
 DEBUG = True
 
@@ -308,10 +310,57 @@ class Edge():
     def __str__(self):
         return f"edge: ({self.x1}, {self.y1}), ({self.x2}, {self.y2}); v:{self.vertical} h:{self.horizontal}"
 
-@dataclass
-class Point:
-    x: int
-    y: int
+
+class PatternOval(PatternDoodler):
+    def __init__(self, mask_width: int, mask_height: int, pattern: Bitmap, bounds: Tuple[Point, Point], stroked = True):
+        """
+        bounds[0] is upper left
+        bounds[1] is lower right
+        """
+        self.stroked = stroked
+        self.upper_left = bounds[0]
+        self.lower_right = bounds[1]
+
+        self._gen_mask(mask_width, mask_height)
+        super(PatternOval, self).__init__(self.mask, pattern)
+
+    def _gen_mask(self, mask_width: int, mask_height: int):
+        self.mask = Bitmap(mask_width, mask_height)
+        self.mask.draw_oval(self.upper_left.x, self.upper_left.y, self.lower_right.x, self.lower_right.y)
+        self.mask.fill_closed_shape(BoundingBox(Point(self.upper_left.x, self.upper_left.y), Point(self.lower_right.x, self.lower_right.y)))
+
+    def _generate(self):
+        super(PatternOval, self)._generate()
+        if self.stroked:
+            self._image.draw_oval(self.upper_left.x, self.upper_left.y, self.lower_right.x, self.lower_right.y)
+
+
+class PatternRoundRect(PatternDoodler):
+    RADIUS = 9
+
+    def __init__(self, mask_width: int, mask_height: int, pattern: Bitmap, bounds: Tuple[Point, Point], stroked = True):
+        """
+        bounds[0] is upper left
+        bounds[1] is lower right
+        """
+        self.stroked = stroked
+        self.upper_left = bounds[0]
+        self.upper_right = Point(bounds[1].x, bounds[0].y)
+        self.lower_right = bounds[1]
+        self.lower_left = Point(bounds[0].x, bounds[1].y)
+
+        self._gen_mask(mask_width, mask_height)
+        super(PatternRoundRect, self).__init__(self.mask, pattern)
+
+    def _gen_mask(self, mask_width: int, mask_height: int):
+        self.mask = Bitmap(mask_width, mask_height)
+        self.mask.draw_roundrect(BoundingBox(self.upper_left, self.lower_right), self.RADIUS)
+        self.mask.fill_closed_shape(BoundingBox(Point(self.upper_left.x, self.upper_left.y), Point(self.lower_right.x, self.lower_right.y)))
+
+    def _generate(self):
+        super(PatternRoundRect, self)._generate()
+        if self.stroked:
+            self._image.draw_roundrect(BoundingBox(self.upper_left, self.lower_right), self.RADIUS)
 
 
 class PatternPolygon(PatternDoodler):

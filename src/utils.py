@@ -1,8 +1,19 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import List, Union, Optional
 import random
+
+@dataclass
+class Point:
+    x: int
+    y: int
+
+@dataclass
+class BoundingBox:
+    upper_left: Point
+    lower_right: Point
 
 class Bitmap:
     def __init__(self, width: int, height: int, pixels: Optional[List[List[int]]] = None):
@@ -229,6 +240,42 @@ class Bitmap:
                     result += " "
             result += "\n"
         return result
+
+    def draw_roundrect(self, bounds: BoundingBox, radius: int):
+        upper_left = bounds.upper_left
+        lower_right = bounds.lower_right
+        upper_right = Point(bounds.lower_right.x, upper_left.y)
+        lower_left = Point(bounds.upper_left.x, lower_right.y)
+
+        upper_left_start = Point(upper_left.x, upper_left.y + radius - 1)
+        upper_left_end = Point(upper_left.x + radius - 1, upper_left.y)
+        upper_right_start = Point(upper_right.x - radius + 1, upper_right.y)
+        upper_right_end = Point(upper_right.x, upper_left.y  + radius - 1)
+        lower_left_start = Point(lower_left.x, lower_left.y - radius + 1)
+        lower_left_end = Point(lower_left.x + radius - 1, lower_left.y)
+        lower_right_start = Point(lower_right.x - radius + 1, lower_right.y)
+        lower_right_end = Point(lower_right.x, lower_left.y - radius + 1)
+
+        self.draw_arc(upper_left_start.x, upper_left_start.y, upper_left_end.x, upper_left_end.y, False)
+        self.draw_arc(upper_right_start.x, upper_right_start.y, upper_right_end.x, upper_right_end.y, False)
+        self.draw_arc(lower_left_start.x, lower_left_start.y, lower_left_end.x, lower_left_end.y, True)
+        self.draw_arc(lower_right_start.x, lower_right_start.y, lower_right_end.x, lower_right_end.y, True)
+
+        self.fill_line(upper_left_end.x, upper_left_end.y, upper_right_start.x, upper_right_start.y)
+        self.fill_line(upper_left_start.x, upper_left_start.y, lower_left_start.x, lower_left_start.y)
+        self.fill_line(lower_left_end.x, lower_left_end.y, lower_right_start.x, lower_right_start.y)
+        self.fill_line(upper_right_end.x, upper_right_end.y, lower_right_end.x, lower_right_end.y)
+
+    def fill_closed_shape(self, bounds: BoundingBox):
+        for y in range(bounds.upper_left.y, bounds.lower_right.y):
+            start = None
+            end = None
+            for x in range(bounds.upper_left.x, bounds.lower_right.x + 1):
+                if not start and self.pixels[y][x]:
+                    start = Point(x, y)
+                if start and self.pixels[y][x]:
+                    end = Point(x, y)
+            self.fill_line(start.x, start.y, end.x, end.y)
 
 def bytes_to_bits(buf: bytes) -> List[int]:
     result = []
