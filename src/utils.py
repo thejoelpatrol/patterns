@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import math
 from typing import List, Union, Optional
 import random
 
@@ -129,6 +131,74 @@ class Bitmap:
                     error = error + dx
                     y = y + sign_y
         self.pct_filled = None
+
+    def _ellipse_y(self, center_x: int, center_y: int, a: int, b: int, x: int, positive: bool) -> int :
+        if x < center_x:
+            start = x
+            end = center_x
+        else:
+            start = center_x
+            end = x
+        translated_x = end - start
+        y_squared = float( (a**2 * b**2) - (b**2 * translated_x**2) ) / a**2
+        y = math.sqrt(y_squared)
+        if positive:
+            return int(y) + center_y
+        else:
+            return -int(y) + center_y
+
+    def _ellipse_x(self, center_x: int, center_y: int, a: int, b: int, y: int, positive: bool) -> int :
+        if y < center_y:
+            start = y
+            end = center_y
+        else:
+            start = center_y
+            end = y
+        translated_y = end - start
+        x_squared = float( (a**2 * b**2) - (a**2 * translated_y**2) ) / b**2
+        x = math.sqrt(x_squared)
+        if positive:
+            return int(x) + center_x
+        else:
+            return -int(x) + center_x
+
+    def draw_arc(self, x0: int, y0: int, x1: int, y1: int, positive: bool):
+        """
+        precondition: x1 >= x0
+        """
+        if positive and y1 > y0:
+            # upper left
+            center_x = x1
+            center_y = y0
+            right = False
+        elif not positive and y1 <= y0:
+            # lower left
+            center_x = x1
+            center_y = y0
+            right = False
+        elif positive and  y1 <= y0:
+            # upper right
+            center_x = x0
+            center_y = y1
+            right = True
+        elif not positive and  y1 > y0:
+            # lower right
+            center_x = x0
+            center_y = y1
+            right = True
+        else:
+            raise RuntimeError(f"wat? ({x0},{y0}) -> ({x1},{y1}")
+
+        a = abs(x1 - x0)
+        b = abs(y1 - y0)
+        for x in range(x0, x1 + 1):
+            y = self._ellipse_y(center_x, center_y, a, b, x, positive)
+            self.set(x, y)
+        # there might be a better way to handle vertical integer portions of the curve
+        increment = 1 if y1 > y0 else -1
+        for y in range(y0, y1 + increment, increment):
+            x = self._ellipse_x(center_x, center_y, a, b, y, right)
+            self.set(x, y)
 
     def __eq__(self, other: Bitmap):
         if self.width != other.width:
